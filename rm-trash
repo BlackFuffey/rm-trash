@@ -10,6 +10,17 @@ no_preserve_root=0      # boolean variable
 
 targets=()      # operation targets
 
+crash() {
+    local msg="$1"
+    local code="${2:-1}"
+
+    if [[ -n "$msg" ]]; then
+        echo "rm: $msg" >&2
+    fi
+
+    exit "$code"
+}
+
 printhelp() {
     echo "See '\\rm --help' for usage"
     echo "Additionally:"
@@ -28,17 +39,6 @@ printver() {
     echo "Licensed under the MIT License <https://opensource.org/licenses/MIT>"
     echo "Made by fluf <https://github.com/BlackFuffey>"
     exit 0
-}
-
-crash() {
-    local msg="$1"
-    local code="${2:-1}"
-
-    if [[ -n "$msg" ]]; then
-        echo "rm: $msg" >&2
-    fi
-
-    exit "$code"
 }
 
 readargs() {
