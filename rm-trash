@@ -5,26 +5,19 @@ set -euo pipefail
 prompt_lv=1     # 0 = never, 1 = when write-protected, 2 = once when recursively or more than 3 files, 3 = before every operation
 dir_op=0        # 0 = no operating on directories, 1 = only empty dir, 2 = all dir
 verbose=0       # boolean variable
-mode=0          # 0 = trash mode, 1 = rm mode
+mode=0          # 0 = trash mode, 1 = rm mode, 2 = dry run
 no_preserve_root=0      # boolean variable
 
 targets=()      # operation targets
 
-readargs "$@"
-
-if [ ${#targets[@]} -eq 0 ]; then 
-    crash "no target specified"
-fi
-
-if [[ $no_preserve_root -eq 1 && $mode -ne 1 ]]; then
-    crash "'--no-preserve-root' must be used with '--now'"
-fi
-
 printhelp() {
-    echo "See 'rm --help' for usage"
+    echo "See '\\rm --help' for usage"
     echo "Additionally:"
     echo "      Use '--now' to invoke regular 'rm' and delete immediately"
-    echo "      '--recursive' will NOT trash files recursively, only allows non-empty directories to be trashed"
+    echo "      Use '--dry-run' to do checks only"
+    echo "Note:"
+    echo "      '--recursive' will NOT trash files recursively, only allows non-empty directories to be trashed."
+    echo "                    But it will however recursively check the directory before trashing."
     echo "      Note that without '--now', rm-trash will refuse to operate on mount points or non-trashable targets"
     exit 0
 }
@@ -61,12 +54,14 @@ readargs() {
                     --recursive) dir_op=2       ;;
 
                           --now) mode=1         ;;
-                      --version) printver       ;;
-                         --help) printhelp      ;;
+                      --dry-run) mode=2         ;;
 
              --no-preserve-root) no_preserve_root=1 ;;
 
                       --verbose) verbose=1      ;;
+
+                      --version) printver       ;;
+                         --help) printhelp      ;;
 
                     --interactive=*)
                         local when="${1#--interactive=}"  # Strip prefix to get value
@@ -115,3 +110,17 @@ readargs() {
         shift
     done
 }
+
+main() {
+    readargs "$@"
+
+    if [ ${#targets[@]} -eq 0 ]; then 
+        crash "no target specified"
+    fi
+
+    if [[ $no_preserve_root -eq 1 && $mode -ne 1 ]]; then
+        crash "'--no-preserve-root' must be used with '--now'"
+    fi
+}
+
+main "$@"
