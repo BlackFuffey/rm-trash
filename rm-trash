@@ -1,0 +1,117 @@
+#!/bin/bash
+
+set -euo pipefail
+
+prompt_lv=1     # 0 = never, 1 = when write-protected, 2 = once when recursively or more than 3 files, 3 = before every operation
+dir_op=0        # 0 = no operating on directories, 1 = only empty dir, 2 = all dir
+verbose=0       # boolean variable
+mode=0          # 0 = trash mode, 1 = rm mode
+no_preserve_root=0      # boolean variable
+
+targets=()      # operation targets
+
+readargs "$@"
+
+if [ ${#targets[@]} -eq 0 ]; then 
+    crash "no target specified"
+fi
+
+if [[ $no_preserve_root -eq 1 && $mode -ne 1 ]]; then
+    crash "'--no-preserve-root' must be used with '--now'"
+fi
+
+printhelp() {
+    echo "See 'rm --help' for usage"
+    echo "Additionally:"
+    echo "      Use '--now' to invoke regular 'rm' and delete immediately"
+    echo "      '--recursive' will NOT trash files recursively, only allows non-empty directories to be trashed"
+    echo "      Note that without '--now', rm-trash will refuse to operate on mount points or non-trashable targets"
+    exit 0
+}
+
+printver() {
+    echo "rm-trash version 1.0.0"
+    echo "A drop-in interactive replacement for 'rm' that trashes instead of deleting"
+    echo "Licensed under the MIT License <https://opensource.org/licenses/MIT>"
+    echo "Made by fluf <https://github.com/BlackFuffey>"
+    exit 0
+}
+
+crash() {
+    local msg="$1"
+    local code="${2:-1}"
+
+    if [[ -n "$msg" ]]; then
+        echo "rm: $msg" >&2
+    fi
+
+    exit "$code"
+}
+
+readargs() {
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            # Long options
+            --*)  
+                case "$1" in
+                        --force) prompt_lv=0    ;;
+                  --interactive) prompt_lv=3    ;;
+
+                          --dir) dir_op=1       ;;
+                    --recursive) dir_op=2       ;;
+
+                          --now) mode=1         ;;
+                      --version) printver       ;;
+                         --help) printhelp      ;;
+
+             --no-preserve-root) no_preserve_root=1 ;;
+
+                      --verbose) verbose=1      ;;
+
+                    --interactive=*)
+                        local when="${1#--interactive=}"  # Strip prefix to get value
+                        case "$when" in
+                           never) prompt_lv=0 ;;
+                            once) prompt_lv=2 ;;
+                          always) prompt_lv=3 ;;
+
+                               *) crash "invalid option '$when' for --interactive" ;;
+                        esac
+                        ;;
+
+                    # Does not have any effect as these are the default
+                    --one-file-system) ;;
+                    --preserve-root) ;;
+                    --preserve-root=all) ;;
+
+                    *) crash "invalid argument '$1'"
+                esac 
+                ;;
+
+            # Short options
+            -*)   
+                opts="${1:1}"  # Strip single dash
+                for ((i=0; i<${#opts}; i++)); do
+                    opt="${opts:$i:1}"
+                    case "$opt" in
+                        f) prompt_lv=0  ;;
+                        I) prompt_lv=2  ;;
+                        i) prompt_lv=3  ;;
+
+                        d) dir_op=1     ;;
+                        r) dir_op=2     ;;
+                        R) dir_op=2     ;;
+
+                        v) verbose=1    ;;
+
+                        *) crash "invalid argument -- '$opt'" ;;
+                    esac
+                done
+                ;;
+
+            # targets
+            *) targets+=("$1") ;;
+        esac
+        shift
+    done
+}
