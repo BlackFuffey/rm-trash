@@ -111,16 +111,34 @@ readargs() {
     done
 }
 
+descfile() {
+
+}
+
 main() {
     readargs "$@"
+
+    refuse() {
+        echo "cannot trash $1: $2" >&2
+    }
+
+    if [[ $no_preserve_root -eq 1 && $mode -ne 1 ]]; then
+        crash "'--no-preserve-root' must be used with '--now'"
+    fi
 
     if [ ${#targets[@]} -eq 0 ]; then 
         crash "no target specified"
     fi
 
-    if [[ $no_preserve_root -eq 1 && $mode -ne 1 ]]; then
-        crash "'--no-preserve-root' must be used with '--now'"
-    fi
+    for item in "${targets[@]}"; do
+        if [ ! -e "$item" ]; then
+            refuse $item "No such file or directory"
+            continue
+        fi
+
+        
+            
+    done
 }
 
 main "$@"
