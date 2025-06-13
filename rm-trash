@@ -15,10 +15,19 @@ crash() {
     local code="${2:-1}"
 
     if [[ -n "$msg" ]]; then
-        echo "rm: $msg" >&2
+        echo -e "rm: $msg" >&2
     fi
 
     exit "$code"
+}
+
+askyn() {
+    local answer
+    read -p "rm: $1 " answer
+    case "$answer" in
+        y* | Y*) return 1 ;;
+              *) return 0 ;;
+    esac
 }
 
 printhelp() {
@@ -111,33 +120,84 @@ readargs() {
     done
 }
 
-descfile() {
+listmount() {
+    if [ -z "$1" ]; then
+        crash "internal error: attempted to listmount empty string" 70
+    fi
 
+    findmnt -rn --output TARGET | grep "^$(realpath "$1")(/|$)"
+}
+
+refuse() {
+    echo "rm: cannot trash $1: $2" >&2
+}
+
+describe() {
+    if [[ ! -e "$1" ]]; then
+        crash "internal error: attempted to describe invalid target '$1'"
+    fi
+
+    local desc=""
+
+    if [[ ! -w $1 ]]; then
+        desc="write-protected "
+    fi
+
+    if [[ -d $1 ]]; then
+        desc="${desc}directory"
+        echo "$desc"
+        return
+}
+
+checkdir() {
+    [ ! -d $1 ] && crash "internal error: attempted to checkdir non directory target '$1'"
+
+    
 }
 
 main() {
     readargs "$@"
-
-    refuse() {
-        echo "cannot trash $1: $2" >&2
-    }
+    
+    local asked = 0     # boolean variable
 
     if [[ $no_preserve_root -eq 1 && $mode -ne 1 ]]; then
-        crash "'--no-preserve-root' must be used with '--now'"
+        crash "'--no-preserve-root' can only be used with '--now'"
     fi
 
     if [ ${#targets[@]} -eq 0 ]; then 
         crash "no target specified"
     fi
 
+    if [ "$prompt_lv" -eq 2 ]; then
+        askyn "trash ${#my_list[@]} targets$([ "$dir_op" -eq 2 ] && " recursively")?"
+        [ $? -eq 0 ] && exit 0
+    fi
+        
+
     for item in "${targets[@]}"; do
         if [ ! -e "$item" ]; then
-            refuse $item "No such file or directory"
+            refuse $item "no such file or directory"
             continue
         fi
 
-        
+        local mntlist=$(listmount "$item")
+
+        if [ -n "$mntlist" ]; then
+            refuse $item "refuse to operate on mountpoint(s): $(echo "$mntlist" | sed 's/^/    /')"
+            continue
+        fi
+
+        if [ "$prompt_lv" -be 1 ]; then
+            [ -d "$item" ] && checkdir "$item" && continue
+
+            if [ ! -w "$item" || "$prompt_lv" -eq 3 ]; then
+                askyn "trash $(describe "$item")?"
+                [ $? -eq 0 ] && targets[$i]="" && continue
+            fi
+        fi
+
             
+                        
     done
 }
 
